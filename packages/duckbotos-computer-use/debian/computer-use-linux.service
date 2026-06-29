@@ -1,0 +1,26 @@
+[Unit]
+Description=DuckBotOS computer-use-linux MCP server
+Documentation=https://github.com/agent-sh/computer-use-linux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/computer-use-linux serve --port 9600 --backend at-spi2+wayland
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Allow AT-SPI2 access for accessibility tree
+DevicePolicy=open
+DeviceAllow=/dev/tty* rw
+
+[Install]
+WantedBy=multi-user.target

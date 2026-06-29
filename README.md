@@ -1,244 +1,100 @@
-# CX Distro
+# DuckBotOS Build Pipeline
 
-**Debian-based Distribution Engineering for CX Linux**
+> Forked from [cxlinux-ai/cx-distro](https://github.com/cxlinux-ai/cx-distro) → [Franzferdinan51/cx-distro](https://github.com/Franzferdinan51/cx-distro)
+>
+> Build system for **DuckBotOS** — a custom Ubuntu 24.04 LTS-based agent-first operating system.
 
-[![License](https://img.shields.io/badge/license-BSL%201.1-orange.svg)](LICENSE)
-[![Debian](https://img.shields.io/badge/base-Debian%2013%20trixie-A81D33.svg)](https://debian.org)
-[![Build](https://img.shields.io/github/actions/workflow/status/cxlinux-ai/cx-distro/build-iso.yml?branch=main)](https://github.com/cxlinux-ai/cx-distro/actions)
+## What This Is
 
-## Overview
+This repository is the **ISO build pipeline** for DuckBotOS. It is a subdirectory of the main [DuckBotOS project](https://github.com/Franzferdinan51/DuckBotOS) and is not meant to be used standalone.
 
-`cx-distro` handles everything related to building and distributing CX Linux as a Debian-based operating system. This includes ISO generation, package repository management, automated installation, and supply-chain security.
+```
+DuckBotOS (main repo)
+└── cx-distro/          ← this repository
+    ├── src/build.sh    ← build entry point
+    ├── src/args.sh     ← Ubuntu 24.04 Noble config
+    ├── src/mods/       ← build-time patches
+    ├── packages/       ← DuckBotOS Debian packages
+    └── Makefile        ← build commands
+```
 
-**CX Linux** is an AI-native operating system that translates natural language commands into Linux operations, eliminating traditional documentation complexity for server management.
-
-## Quick Start
-
-### Build ISO (Debian/Ubuntu host required)
+## Quick Start (in a Linux VM)
 
 ```bash
-# Clone repository
-git clone https://github.com/cxlinux-ai/cx-distro.git
-cd cx-distro
+# Clone the main DuckBotOS repo (includes this subdirectory)
+git clone --recurse-submodules https://github.com/Franzferdinan51/DuckBotOS
+cd DuckBotOS/cx-distro
 
-# Install dependencies (requires sudo)
-sudo apt-get install -y live-build debootstrap squashfs-tools xorriso \
-    isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin \
-    mtools dosfstools dpkg-dev devscripts debhelper fakeroot gnupg
+# Install build dependencies
+sudo apt update && sudo apt install -y live-build debootstrap squashfs-tools xorriso ...
 
-# Build offline ISO (recommended)
-chmod +x scripts/build.sh
-sudo ./scripts/build.sh offline
-
-# Or use Makefile
-make deps  # Install dependencies
-make iso   # Build ISO
+# Build the ISO
+make deps
+make iso
+# Output: output/duckbotos-*.iso
 ```
 
-### Output
+## DuckBotOS Packages
 
-After a successful build:
-```
-output/
-├── cx-linux-0.1.0-amd64-offline.iso      # Bootable ISO
-├── cx-linux-0.1.0-amd64-offline.iso.sha256
-├── packages/
-│   ├── cx-archive-keyring_*.deb
-│   ├── cx-core_*.deb
-│   └── cx-full_*.deb
-└── sbom/
-    ├── cx-linux-0.1.0.cdx.json           # CycloneDX SBOM
-    └── cx-linux-0.1.0.spdx.json          # SPDX SBOM
+| Package | Description |
+|---------|-------------|
+| `duckbotos-base` | Core OS: Ubuntu Server + Python + Node + Weston |
+| `duckbotos-hermes` | Hermes v0.17 "Reach" agent + web dashboard at :9119 |
+| `duckbotos-openclaw` | OpenClaw gateway + openclaw-os at :18789 |
+| `duckbotos-lm-studio` | LM Studio API server at :1234 (GPU-accelerated local models) |
+| `duckbotos-browseros` | BrowserOS as default browser |
+| `duckbotos-computer-use` | computer-use-linux MCP server (AT-SPI2 + Wayland desktop control) |
+| `duckbotos-kiosk` | Weston + Chromium kiosk shell (the OS surface) |
+| `duckbotos-session-picker` | Web UI for choosing Hermes / OpenClaw / Hybrid mode |
+| `duckbotos-hybrid` | Both-mode: Hermes + OpenClaw with session picker |
+| `duckbotos-meta` | Meta-packages: hermes / openclaw / hybrid defaults |
+| `duckbotos-branding` | Plymouth theme, GDM, MOTD, wallpapers |
+
+## Build Modes
+
+Set `DUCKBOTOS_MODE` before building:
+
+```bash
+DUCKBOTOS_MODE=hermes make iso   # Hermes-only ISO
+DUCKBOTOS_MODE=openclaw make iso # OpenClaw-only ISO
+DUCKBOTOS_MODE=both make iso     # Both agents + session picker
 ```
 
 ## Architecture
 
 ```
-cx-distro/
-├── iso/                        # ISO build configuration
-│   ├── live-build/             # Debian live-build configs
-│   │   ├── auto/               # Build automation scripts
-│   │   └── config/             # Package lists, hooks, includes
-│   └── preseed/                # Automated installation preseeds
-├── packages/                   # Debian package definitions
-│   ├── cx-archive-keyring/ # GPG keyring package
-│   ├── cx-core/            # Minimal installation meta-package
-│   └── cx-full/            # Full installation meta-package
-├── repository/                 # APT repository tooling
-│   └── scripts/                # repo-manage.sh
-├── sbom/                       # SBOM generation (CycloneDX/SPDX)
-├── branding/                   # Plymouth theme, wallpapers
-├── scripts/                    # Build automation
-│   └── build.sh                # Master build script
-├── tests/                      # Verification tests
-│   ├── verify-iso.sh
-│   ├── verify-packages.sh
-│   └── verify-preseed.sh
-├── .github/workflows/          # CI/CD pipelines
-├── Makefile                    # Build targets
-└── README.md
+ISO build (cx-distro/)     →  DuckBotOS.iso
+├── debootstrap Ubuntu 24.04
+├── apply src/mods/ patches
+│   ├── 50-duckbotos-meta-mod       (selects packages by mode)
+│   └── 51-duckbotos-install-mod    (clones packages, builds, installs)
+├── install duckbotos-* packages
+└── package as .iso
+    └── User boots .iso
+        ├── Kiosk loads agent URL
+        ├── Agent starts at boot
+        └── User talks to the OS via natural language
 ```
-
-## Key Components
-
-| Component | Description |
-|-----------|-------------|
-| **ISO Builder** | Reproducible ISO image pipeline using Debian live-build |
-| **APT Repository** | Signed package repository with GPG key management |
-| **Meta-packages** | cx-core (minimal), cx-full (complete) |
-| **First-boot** | Preseed automation and idempotent provisioning |
-| **SBOM** | Software Bill of Materials (CycloneDX/SPDX) |
-
-## Installation Profiles
-
-### cx-core (Minimal)
-- Base system with Python 3.11+
-- Security sandbox (Firejail, AppArmor)
-- SSH server
-- CX package manager dependencies
-
-### cx-full (Recommended)
-Everything in cx-core plus:
-- Docker and container tools
-- Network security (nftables, fail2ban)
-- Monitoring (Prometheus node exporter)
-- Web server (nginx) and TLS (certbot)
-- GPU support prerequisites
-- Modern CLI tools (htop, btop, fzf, ripgrep, bat)
-
-## Automated Installation
-
-CX Linux supports fully unattended installation via preseed:
-
-```bash
-# Boot parameter for automated install
-preseed/file=/cdrom/preseed/cx.preseed
-```
-
-### Preseed Features
-- UEFI and BIOS support
-- LVM partitioning (default)
-- Optional LUKS encryption
-- SSH key injection
-- Admin user creation
-- CX repository configuration
-
-## APT Repository
-
-CX uses a signed APT repository with deb822 format:
-
-```
-# /etc/apt/sources.list.d/cx.sources
-Types: deb
-URIs: https://repo.cxlinux.com/apt
-Suites: cx cx-updates cx-security
-Components: main
-Signed-By: /usr/share/keyrings/cx-archive-keyring.gpg
-```
-
-### Repository Management
-
-```bash
-# Initialize repository
-./repository/scripts/repo-manage.sh init
-
-# Add package
-./repository/scripts/repo-manage.sh add packages/cx-core_0.1.0-1_all.deb
-
-# Publish (sign and generate metadata)
-CX_GPG_KEY_ID=ABCD1234 ./repository/scripts/repo-manage.sh publish
-
-# Create snapshot
-./repository/scripts/repo-manage.sh snapshot
-
-# Export for offline use
-./repository/scripts/repo-manage.sh export cx-offline-repo
-```
-
-## Security
-
-### Supply Chain
-- Signed ISO images (SHA256/SHA512)
-- Signed APT repository (GPG)
-- SBOM generation (CycloneDX, SPDX)
-- Reproducible builds (goal)
-
-### System Hardening
-- AppArmor profiles
-- Firejail sandboxing
-- Secure sysctl defaults
-- SSH hardening
-- nftables firewall
-
-## Build Targets
-
-```bash
-make help           # Show all targets
-make iso            # Build full offline ISO
-make iso-netinst    # Build minimal network installer
-make package        # Build all Debian packages
-make package PKG=cx-core  # Build specific package
-make sbom           # Generate SBOM
-make test           # Run verification tests
-make clean          # Remove build artifacts
-make deps           # Install build dependencies
-```
-
-## Topics Covered
-
-This repository implements 9 major topics from the CX Linux planning:
-
-- [x] Automated installation and first-boot provisioning
-- [x] CX package repository and apt trust model
-- [x] Debian base selection and compatibility contract
-- [ ] Debian packaging strategy for CX components
-- [ ] GPU driver enablement and packaging (NVIDIA/AMD)
-- [x] ISO image build system (live-build)
-- [ ] Kernel, firmware, and hardware enablement plan
-- [x] Reproducible builds, artifact signing, and SBOM outputs
-- [ ] Upgrade, rollback, and version pinning
-
-## Requirements
-
-### Build Host
-- Debian 12+ or Ubuntu 24.04+
-- 10GB+ free disk space
-- Internet connection (for package downloads)
-- Root/sudo access
-
-### Target Hardware
-- x86_64 (amd64) architecture
-- UEFI or Legacy BIOS
-- 2GB+ RAM (4GB+ recommended)
-- 20GB+ storage
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes
-4. Run tests: `make test`
-5. Submit PR
-
-## Related Repositories
-
-- [cx-terminal](https://github.com/cxlinux-ai/cx-core) - AI-powered terminal emulator
-- [website](https://github.com/cxlinux-ai/website) - cxlinux-ai.com
 
 ## License
 
-BSL 1.1 - See [LICENSE](LICENSE)
+- **Build pipeline code**: Apache 2.0 (Franzferdinan51)
+- **cxlinux-ai/cx-distro inherited code**: BSL 1.1 (free for personal use, converts to Apache 2032)
+- **Hermes**: MIT (NousResearch)
+- **OpenClaw**: MIT (OpenClaw team)
+- **computer-use-linux**: TBD (agent-sh)
+- **BrowserOS**: TBD (browseros-ai)
 
-## Support
+## Upstream Tracking
 
-- Documentation: https://cxlinux.com/docs
-- Issues: https://github.com/cxlinux-ai/cx-distro/issues
-- Discord: https://discord.gg/7K6TR7qtS
+```bash
+git remote add upstream https://github.com/cxlinux-ai/cx-distro.git
+git fetch upstream
+# Merge upstream changes:
+git merge upstream/main --no-edit
+```
 
----
+## CI/CD
 
-**Copyright 2025 AI Venture Holdings LLC**
+GitHub Actions auto-builds the ISO on every push to `duckbotos` branch.
+See `.github/workflows/build-iso.yml` in the main DuckBotOS repo.
