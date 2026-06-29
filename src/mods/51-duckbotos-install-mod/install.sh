@@ -51,6 +51,7 @@ done
 # Build agent-specific packages
 for pkg in duckbotos-hermes duckbotos-openclaw duckbotos-lm-studio \
            duckbotos-browseros duckbotos-computer-use duckbotos-kiosk \
+           duckbotos-kiosk-hermes duckbotos-session-picker \
            duckbotos-meta duckbotos-hybrid; do
     if [ -d "$pkg" ]; then
         print_info "  Building $pkg..."
@@ -82,6 +83,7 @@ for deb in /tmp/cx-distro/packages/*.deb; do
             esac
             ;;
         both|hybrid)
+            # Install all packages for both mode
             install=true
             ;;
     esac
