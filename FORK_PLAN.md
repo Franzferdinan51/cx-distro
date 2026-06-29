@@ -45,7 +45,7 @@ In `iso/live-build/` config — update `--distribution` and package lists.
 | (new) | `duckbotos-hermes` | Hermes agent + web dashboard :9119 |
 | (new) | `duckbotos-openclaw` | OpenClaw gateway + openclaw-os plugin :18789 |
 | (new) | `duckbotos-browseros` | BrowserOS as default browser |
-| (new) | `duckbotos-computer-use` | computer-use-linux MCP server |
+| (new) | `duckbotos-computer-use` | Newest Desktop Control (Lobster Edition) MCP server |
 | (new) | `duckbotos-meta` | Master meta-package (depends on mode package) |
 | (new) | `duckbotos-kiosk` | Weston + Chromium kiosk service |
 | (new) | `duckbotos-hybrid` | Both mode: depends on hermes + openclaw |
@@ -162,7 +162,7 @@ Our new code: Apache 2.0
 CX Linux pipeline: BSL 1.1 (free for personal use, converts to Apache 2032)
 Hermes: MIT
 OpenClaw: MIT
-computer-use-linux: TBD (check their repo)
+Newest Desktop Control (Lobster Edition): TBD (check their repo)
 BrowserOS: TBD (check their repo)
 
 We write all our package code fresh. Fork the build pipeline. No BSL contamination in our source files.

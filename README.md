@@ -43,7 +43,7 @@ make iso
 | `duckbotos-openclaw` | OpenClaw gateway + openclaw-os at :18789 |
 | `duckbotos-lm-studio` | LM Studio API server at :1234 (GPU-accelerated local models) |
 | `duckbotos-browseros` | BrowserOS as default browser |
-| `duckbotos-computer-use` | computer-use-linux MCP server (AT-SPI2 + Wayland desktop control) |
+| `duckbotos-computer-use` | Newest Desktop Control (Lobster Edition) MCP server (AT-SPI2 + Wayland desktop control) |
 | `duckbotos-kiosk` | Weston + Chromium kiosk shell (the OS surface) |
 | `duckbotos-session-picker` | Web UI for choosing Hermes / OpenClaw / Hybrid mode |
 | `duckbotos-hybrid` | Both-mode: Hermes + OpenClaw with session picker |
@@ -82,7 +82,7 @@ ISO build (cx-distro/)     →  DuckBotOS.iso
 - **cxlinux-ai/cx-distro inherited code**: BSL 1.1 (free for personal use, converts to Apache 2032)
 - **Hermes**: MIT (NousResearch)
 - **OpenClaw**: MIT (OpenClaw team)
-- **computer-use-linux**: TBD (agent-sh)
+- **Newest Desktop Control (Lobster Edition)**: TBD (agent-sh)
 - **BrowserOS**: TBD (browseros-ai)
 
 ## Upstream Tracking

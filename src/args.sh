@@ -101,9 +101,9 @@ export DEFAULT_APPS="
     libportaudio2, alsa-utils, pulseaudio,
     # Display / Wayland (Weston kiosk)
     weston, xwayland, wayland-protocols, libwayland-bin,
-    # Accessibility (computer-use-linux needs AT-SPI2)
+    # Accessibility (Newest Desktop Control (Lobster Edition) needs AT-SPI2)
     at-spi2-core, at-spi2-atk,
-    # Screenshot / clipboard (computer-use-linux uses these)
+    # Screenshot / clipboard (Newest Desktop Control (Lobster Edition) uses these)
     grim, wl-clipboard,
     # Python runtime (Hermes)
     python3, python3-pip, python3-venv, python3-yaml, python3-requests, python3-aiohttp,
