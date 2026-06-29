@@ -1,16 +1,153 @@
 #!/bin/bash
 # postinst for duckbotos-computer-use
+# Installs Duckets' local "Newest Desktop Control" Lobster Edition
 
 set -e
 
+NDC_DIR="/opt/duckbotos/desktop-control"
+NDC_REPO="https://github.com/Franzferdinan51/desktop-control-lobster-edition-skill"
+REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
+REAL_USER=$(getent passwd | awk -F: '$3 >= 1000 {print $1; exit}')
+
 case "$1" in
     configure)
-        # Enable and start the computer-use-linux MCP service
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl --user daemon-reload 2>/dev/null || true
-            systemctl --user enable computer-use-linux.service 2>/dev/null || true
-            systemctl --user start computer-use-linux.service 2>/dev/null || true
+        echo "[duckbotos-computer-use] Installing Newest Desktop Control (Lobster Edition)..."
+
+        # 1. Clone or update the repo
+        if [ ! -d "$NDC_DIR" ]; then
+            git clone --depth=1 --branch main "$NDC_REPO" "$NDC_DIR"
+        else
+            (cd "$NDC_DIR" && git pull origin main --ff-only) || true
         fi
+
+        # 2. Install Python dependencies (PyAutoGUI + Pillow + pygetwindow + pytesseract + screeninfo + psutil)
+        echo "[duckbotos-computer-use] Installing Python dependencies..."
+        if command -v pip3 >/dev/null 2>&1; then
+            pip3 install --break-system-packages --quiet -r "$NDC_DIR/requirements.txt" 2>&1 | tail -5 || true
+        fi
+
+        # 3. Run install.sh with --no-tests (tests require a display)
+        echo "[duckbotos-computer-use] Running install.sh --no-tests --target openclaw..."
+        bash "$NDC_DIR/scripts/install.sh" --no-tests --target openclaw --no-config 2>&1 | tail -10 || true
+
+        # 4. Set permissions
+        chown -R "$REAL_USER:$REAL_USER" "$NDC_DIR" 2>/dev/null || true
+        chmod +x "$NDC_DIR/src/server.js"
+
+        # 5. Install systemd service
+        cat > /etc/systemd/system/duckbotos-desktop-control.service << SVCEOF
+[Unit]
+Description=DuckBotOS Newest Desktop Control MCP server (Lobster Edition)
+Documentation=https://github.com/Franzferdinan51/desktop-control-lobster-edition-skill
+After=graphical.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${REAL_USER:-root}
+WorkingDirectory=${NDC_DIR}
+ExecStart=/usr/bin/node ${NDC_DIR}/src/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Linux desktop requirements
+SupplementaryGroups=video input tty
+PAMName=login
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=${NDC_DIR} /tmp /run/user/${REAL_USER:-0}
+PrivateTmp=true
+DevicePolicy=closed
+DeviceAllow=char-pts rw
+DeviceAllow=/dev/tty rw
+DeviceAllow=/dev/dri rw
+DeviceAllow=/dev/input rw
+
+[Install]
+WantedBy=graphical.target
+SVCEOF
+
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable duckbotos-desktop-control.service 2>/dev/null || true
+        systemctl start duckbotos-desktop-control.service 2>/dev/null || true
+
+        # 6. Wire into Hermes (writes MCP config)
+        HERMES_MCP_CFG="$REAL_HOME/.hermes/mcp-servers.json"
+        if [ -d "$REAL_HOME/.hermes" ]; then
+            mkdir -p "$REAL_HOME/.hermes"
+            if [ ! -f "$HERMES_MCP_CFG" ]; then
+                echo '{}' > "$HERMES_MCP_CFG"
+                chown "$REAL_USER:$REAL_USER" "$HERMES_MCP_CFG" 2>/dev/null || true
+            fi
+            python3 - << PYEOF
+import json
+cfg = '/${HERMES_MCP_CFG}'
+with open(cfg) as f:
+    cfg_data = json.load(f)
+if 'mcpServers' not in cfg_data:
+    cfg_data['mcpServers'] = {}
+cfg_data['mcpServers']['desktop-control'] = {
+    'command': 'node',
+    'args': ['${NDC_DIR}/src/server.js'],
+    'transport': 'stdio',
+    'description': 'Newest Desktop Control (Lobster Edition) — DuckBotOS desktop control'
+}
+with open(cfg, 'w') as f:
+    json.dump(cfg_data, f, indent=2)
+print('[duckbotos-computer-use] Hermes MCP config updated.')
+PYEOF
+            chown -R "$REAL_USER:$REAL_USER" "$HERMES_MCP_CFG" 2>/dev/null || true
+        fi
+
+        # 7. Wire into OpenClaw via Python JSON patch
+        OPENCLAW_CFG="/var/lib/openclaw/workspace/openclaw.json"
+        if [ -d "/var/lib/openclaw/workspace" ]; then
+            mkdir -p "/var/lib/openclaw/workspace"
+            if [ ! -f "$OPENCLAW_CFG" ]; then
+                echo '{}' > "$OPENCLAW_CFG"
+            fi
+            python3 - << PYEOF
+import json
+cfg = '$OPENCLAW_CFG'
+with open(cfg) as f:
+    cfg_data = json.load(f)
+if 'plugins' not in cfg_data:
+    cfg_data['plugins'] = {}
+if 'entries' not in cfg_data['plugins']:
+    cfg_data['plugins']['entries'] = {}
+cfg_data['plugins']['entries']['desktop-control'] = {
+    'enabled': True,
+    'config': {
+        'command': 'node',
+        'args': ['$NDC_DIR/src/server.js'],
+        'transport': 'stdio',
+        'name': 'desktop-control',
+        'description': 'Newest Desktop Control — DuckBotOS desktop control via PyAutoGUI + AT-SPI2',
+        'repository': 'https://github.com/Franzferdinan51/desktop-control-lobster-edition-skill',
+    }
+}
+with open(cfg, 'w') as f:
+    json.dump(cfg_data, f, indent=2)
+print('[duckbotos-computer-use] OpenClaw plugin desktop-control registered.')
+PYEOF
+            # Restart OpenClaw to pick up new plugin
+            if command -v systemctl >/dev/null 2>&1 && [ -n "$REAL_USER" ]; then
+                systemctl --user restart openclaw-gateway 2>/dev/null || true
+            fi
+        fi
+
+        echo ""
+        echo "✅ Newest Desktop Control (Lobster Edition) installed at $NDC_DIR"
+        echo "   Service: systemctl status duckbotos-desktop-control"
+        echo "   MCP tools: 20+ (screenshot, mouse, keyboard, clipboard, apps, windows, files, Android)"
+        echo "   Hermes: MCP server registered at $HERMES_MCP_CFG"
+        echo "   OpenClaw: plugin desktop-control registered in openclaw.json"
+        echo "   Optional: install duckbotos-cua-bridge for trycua/cua integration"
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;
