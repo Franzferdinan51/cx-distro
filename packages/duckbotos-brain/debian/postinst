@@ -5,6 +5,8 @@
 set -e
 
 BRAIN_DIR="/opt/duckbotos/brain"
+REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
+REAL_USER=$(getent passwd | awk -F: '$3 >= 1000 {print $1; exit}')
 BRAIN_ENV="/etc/duckbotos/brain.env"
 BRAIN_SERVICE_DIR="/etc/systemd/system"
 SERVICE_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65536 {print $1; exit}')
@@ -57,7 +59,7 @@ MCPEOF
         chmod +x /usr/bin/duckbotos-brain-mcp
 
         # Install OpenClaw native plugin (spawns Python MCP server, proxies 67 tools)
-        OPENCLAW_EXT_DIR="/var/lib/openclaw/extensions"
+        OPENCLAW_EXT_DIR="$REAL_HOME/.openclaw/extensions"
         if [ -d "$BRAIN_DIR/extensions/duckbot-memory" ]; then
             mkdir -p "$OPENCLAW_EXT_DIR"
             cp -r "$BRAIN_DIR/extensions/duckbot-memory" "$OPENCLAW_EXT_DIR/"
@@ -116,7 +118,7 @@ SVCEOF
         fi
 
         # Register the brain plugin in openclaw.json (if OpenClaw is installed)
-        OPENCLAW_CFG="/var/lib/openclaw/workspace/openclaw.json"
+        OPENCLAW_CFG="$REAL_HOME/.openclaw/openclaw.json"
         if [ -f "$OPENCLAW_CFG" ]; then
             # Register duckbot-memory plugin via openclaw CLI
             if command -v openclaw >/dev/null 2>&1; then

@@ -6,12 +6,13 @@ set -e
 
 REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
 OPENCLAW_DIR="/opt/openclaw"
-OPENCLAW_DATA_DIR="/var/lib/openclaw"
-OPENCLAW_WORKSPACE_DIR="/var/lib/openclaw/workspace"
+# OpenClaw state/config lives at ~/.openclaw/ per src/config/paths.ts
+OPENCLAW_STATE_DIR="$REAL_HOME/.openclaw"
+OPENCLAW_CONFIG_PATH="$OPENCLAW_STATE_DIR/openclaw.json"
 SYSTEMD_USER_DIR="$REAL_HOME/.config/systemd/user"
 DUCKBOTOS_MODES_DIR="/etc/duckbotos"
 BRAIN_EXT_SRC="/opt/duckbotos/brain/extensions/duckbot-memory"
-OPENCLAW_EXT_DIR="/var/lib/openclaw/extensions"
+OPENCLAW_EXT_DIR="$OPENCLAW_STATE_DIR/extensions"
 
 install_openclaw() {
     local home="${1:-$REAL_HOME}"
@@ -20,8 +21,7 @@ install_openclaw() {
 
     # Create directories
     mkdir -p "$OPENCLAW_DIR"
-    mkdir -p "$OPENCLAW_DATA_DIR"
-    mkdir -p "$OPENCLAW_WORKSPACE_DIR"
+    mkdir -p "$OPENCLAW_STATE_DIR"
     mkdir -p "$SYSTEMD_USER_DIR"
     mkdir -p "$OPENCLAW_EXT_DIR"
 
@@ -44,8 +44,8 @@ install_openclaw() {
     cat > /usr/local/bin/openclaw << 'OPENCLAW_WRAPPER'
 #!/bin/bash
 # OpenClaw CLI wrapper for DuckBotOS
-export OPENCLAW_HOME="${OPENCLAW_HOME:-/var/lib/openclaw}"
-export OPENCLAW_DATA="${OPENCLAW_DATA:-/var/lib/openclaw/workspace}"
+export OPENCLAW_HOME="${OPENCLAW_HOME:-${REAL_HOME}/.openclaw}"
+export OPENCLAW_DATA="${OPENCLAW_DATA:-${REAL_HOME}/.openclaw/workspace}"
 export NODE_ENV=production
 cd /opt/openclaw
 exec node /opt/openclaw/dist/index.js "$@"
@@ -62,12 +62,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=${OPENCLAW_WORKSPACE_DIR}
+WorkingDirectory=${OPENCLAW_STATE_DIR}
 Environment=OPENCLAW_HOME=${OPENCLAW_DIR}
-Environment=OPENCLAW_DATA=${OPENCLAW_WORKSPACE_DIR}
+Environment=OPENCLAW_STATE_DIR=${OPENCLAW_STATE_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=18789
-ExecStart=/usr/local/bin/openclaw gateway start --port 18789 --workspace ${OPENCLAW_WORKSPACE_DIR}
+ExecStart=/usr/local/bin/openclaw gateway start --port 18789 --workspace ${OPENCLAW_STATE_DIR}
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -75,7 +75,7 @@ StandardError=journal
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=${OPENCLAW_DATA_DIR} ${OPENCLAW_DIR}
+ReadWritePaths=${OPENCLAW_STATE_DIR} ${OPENCLAW_DIR}
 PrivateTmp=true
 
 [Install]
@@ -116,36 +116,51 @@ register_brain_plugin() {
         return 0
     fi
 
-    # Register plugin in openclaw.json via python (safe JSON patching)
-    OPENCLAW_CFG="$OPENCLAW_WORKSPACE_DIR/openclaw.json"
-    mkdir -p "$OPENCLAW_WORKSPACE_DIR"
-
-    # Create default openclaw.json if it doesn't exist
+    # Register plugin in OpenClaw config via python (safe JSON patching)
+    # NOTE: OpenClaw config lives at $HOME/.openclaw/openclaw.json per
+    # src/config/paths.ts:resolveCanonicalConfigPath returns ~/.openclaw/openclaw.json.
+    # NOT /var/lib/openclaw/workspace/openclaw.json (that was wrong).
+    OPENCLAW_CFG="$REAL_HOME/.openclaw/openclaw.json"
+    mkdir -p "$REAL_HOME/.openclaw"
+    if [ -n "$REAL_USER" ]; then
+        chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.openclaw" 2>/dev/null || true
+    fi
     if [ ! -f "$OPENCLAW_CFG" ]; then
         echo '{}' > "$OPENCLAW_CFG"
+        [ -n "$REAL_USER" ] && chown "$REAL_USER:$REAL_USER" "$OPENCLAW_CFG" 2>/dev/null || true
     fi
 
     python3 - << PYEOF
-import json, os
-cfg_path = '/var/lib/openclaw/workspace/openclaw.json'
+import json, os, pwd
+real_user = '$REAL_USER'
+real_home = '$REAL_HOME'
+cfg_path = f'{real_home}/.openclaw/openclaw.json'
 with open(cfg_path) as f:
     cfg = json.load(f)
 
-# Ensure nested structure
 if 'plugins' not in cfg:
     cfg['plugins'] = {}
 if 'entries' not in cfg['plugins']:
     cfg['plugins']['entries'] = {}
 
-# Register duckbot-memory brain plugin
 cfg['plugins']['entries']['duckbot-memory'] = {
     'enabled': True,
     'config': {
         'repoPath': '/opt/duckbotos/brain',
-        'autoWakeUp': True,   # brain_wake_up fires on every session_start
-        'autoSync': True,     # brain_sync fires on every session_end
+        'autoWakeUp': True,
+        'autoSync': True,
         'defaultK': 8
     }
+}
+
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+try:
+    os.chown(cfg_path, pwd.getpwnam(real_user).pw_uid, -1)
+except Exception:
+    pass
+print(f'[duckbotos-openclaw] duckbot-memory registered at {cfg_path}')
+PYEOF
 }
 
 with open(cfg_path, 'w') as f:
