@@ -1,0 +1,36 @@
+name: Audit Debian Packages
+
+on:
+  push:
+    branches: [duckbotos, main]
+  pull_request:
+    branches: [duckbotos, main]
+
+jobs:
+  audit:
+    name: Audit packages (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout packages
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            packages/
+            scripts/
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run package audit
+        run: |
+          python3 scripts/audit-debian-packages.py
+
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package-audit-${{ github.ref_name }}
+          path: audit-summary.txt
+          retention-days: 14

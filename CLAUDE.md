@@ -1,75 +1,87 @@
-# CX-DISTRO - ISO Builder
+# cx-distro — DuckBotOS ISO Builder
+
+> For agents working in this directory: DuckBotOS is the parent context.
+> See `~/Desktop/DuckBotOS/CLAUDE.md` for the full DuckBotOS overview.
 
 ## Purpose
-Custom ISO builder for CX Linux distributions. Creates Debian/Ubuntu-based images with embedded LLM and NVIDIA variants.
+ISO build pipeline for **DuckBotOS** — creates bootable Ubuntu 24.04-based images with Hermes and/or OpenClaw agents pre-installed.
 
-## Repo Role in Ecosystem
-- **Distribution builder** - creates installable ISOs
-- Depends on: cx (pre-installed), cx-llm (for embedded models)
-- Output: Bootable ISO images
+## Relationship to DuckBotOS
 
-## Key Features
-- Debian/Ubuntu base system customization
-- Embedded LLM model options (7B, 13B, 70B)
-- NVIDIA driver variants (with CUDA)
-- Automated installer with AI-guided setup
-- Live USB support
+```
+DuckBotOS/ (main repo — github.com/Franzferdinan51/DuckBotOS)
+└── cx-distro/  ← you are here
+    ├── packages/    ← duckbotos-* Debian packages (actual buildable source)
+    ├── src/         ← build scripts, live-build config, mods
+    ├── scripts/     ← build helpers
+    └── iso/         ← live-build config (auto-generated at build time)
+```
+
+This is a **sibling subdirectory** of DuckBotOS/main. The build-iso.yml workflow in DuckBotOS clones this repo fresh on every CI run.
 
 ## Key Directories
+
 ```
 cx-distro/
-├── base/           # Base system configuration
-├── profiles/       # Distribution profiles
-│   ├── minimal/    # CLI only
-│   ├── desktop/    # Full desktop
-│   └── server/     # Server variant
-├── nvidia/         # NVIDIA-specific builds
-├── scripts/        # Build scripts
-└── iso/            # ISO generation
+├── packages/         ← duckbotos-* Debian source packages (15 total)
+│   ├── duckbotos-base/
+│   ├── duckbotos-hermes/     ← Hermes agent gateway + dashboard :9119
+│   ├── duckbotos-openclaw/   ← OpenClaw gateway + openclaw-os :18789
+│   ├── duckbotos-lm-studio/  ← LM Studio API server :1234
+│   ├── duckbotos-brain/      ← duckbot-rag-memory (brain)
+│   ├── duckbotos-computer-use/ ← Newest Desktop Control (clawdwatch-lobster-edition)
+│   ├── duckbotos-browseros/  ← BrowserOS as default browser
+│   ├── duckbotos-kiosk/      ← Weston + Chromium kiosk
+│   ├── duckbotos-session-picker/ ← Hermes/OpenClaw/Hybrid picker
+│   ├── duckbotos-hybrid/     ← Both modes + picker
+│   ├── duckbotos-meta/        ← Mode meta-packages
+│   └── duckbotos-branding/   ← Plymouth, MOTD, GDM theme
+├── src/
+│   ├── build.sh          ← ISO build entry point
+│   ├── args.sh           ← Ubuntu 24.04 Noble configuration
+│   └── mods/             ← live-build patches
+└── scripts/
+    ├── install.sh        ← DuckBotOS installer (curl|bash)
+    └── install-deps.sh  ← Build dependency installer
 ```
 
-## Building an ISO
+## Build Modes
+
 ```bash
-# Minimal CLI image
-./build.sh --profile minimal --output cx-minimal.iso
-
-# Desktop with embedded 7B model
-./build.sh --profile desktop --llm 7b --output cx-desktop-7b.iso
-
-# Server with NVIDIA drivers
-./build.sh --profile server --nvidia --output cx-server-nvidia.iso
+DUCKBOTOS_MODE=hermes   # Hermes only, dashboard at :9119
+DUCKBOTOS_MODE=openclaw # OpenClaw only, openclaw-os at :18789
+DUCKBOTOS_MODE=both     # Both + session picker at boot
 ```
 
 ## Build Requirements
-- Debian/Ubuntu host
-- debootstrap
-- squashfs-tools
-- xorriso
-- 50GB+ free space
+- Debian/Ubuntu host (24.04 Noble or Debian Trixie)
+- `live-build`, `debootstrap`, `squashfs-tools`, `xorriso`
+- 50GB+ free disk space
 - Root access
 
-## Development Setup
+## Building Locally
 ```bash
-# Install build dependencies
-sudo apt install debootstrap squashfs-tools xorriso live-build
+# Install dependencies
+sudo apt install live-build debootstrap squashfs-tools xorriso
 
-# Test build (small image)
-./build.sh --profile minimal --test
-```
-
-## Configuration
-Edit `profiles/{profile}/config.yaml`:
-```yaml
-base: ubuntu-24.04
-packages:
-  - cx
-  - cx-cli
-llm:
-  model: mistral:7b
-  embedded: true
+# Build ISO
+make deps
+make iso
+# Output: output/duckbotos-*.iso
 ```
 
 ## CI/CD
-- GitHub Actions builds nightly ISOs
-- Releases published to GitHub Releases
-- SHA256 checksums for all images
+
+| Workflow | Repo | Fires on | What it does |
+|----------|------|---------|-------------|
+| `build-iso.yml` | DuckBotOS | push to main/duckbotos | Clones this repo, builds ISO, uploads artifact |
+| `audit.yml` | cx-distro | push to duckbotos | Audits packages/ |
+| `sync-to-duckbotos.yml` | cx-distro | push to duckbotos | Mirrors packages → DuckBotOS/main |
+| `release.yml` | cx-distro | tag `v*` | Creates GitHub release |
+
+## Important Notes
+
+- **DO NOT** hardcode usernames in systemd service files → use `User=%h`
+- **All packages** have `debian/control`, `debian/rules`, `debian/changelog`
+- **Service files** are installed from `debian/*.service`
+- **Postinst scripts** handle enable/start of services at install time

@@ -1,0 +1,57 @@
+name: Sync to DuckBotOS
+
+on:
+  push:
+    branches: [duckbotos]
+    paths:
+      - 'packages/**'
+      - 'scripts/**'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync → DuckBotOS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cx-distro
+        uses: actions/checkout@v4
+
+      - name: Clone DuckBotOS
+        run: |
+          git clone --depth=1 https://github.com/Franzferdinan51/DuckBotOS.git DuckBotOS-target
+
+      - name: Sync and push
+        id: sync
+        run: |
+          set -e
+          set -o pipefail
+
+          echo "=== Syncing packages/ → DuckBotOS ==="
+          rsync -av --delete \
+            cx-distro/packages/ \
+            DuckBotOS-target/packages/
+
+          echo "=== Syncing scripts/ → DuckBotOS ==="
+          rsync -av --delete \
+            cx-distro/scripts/ \
+            DuckBotOS-target/scripts/
+
+          echo "=== Committing ==="
+          cd DuckBotOS-target
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No relevant changes — nothing to sync"
+            echo "result=no_changes" >> $GITHUB_OUTPUT
+          else
+            git -c user.name="github-actions[bot]" \
+                -c user.email="github-actions[bot]@users.noreply.github.com" \
+                commit -m "🔄 Auto-sync: packages/scripts from cx-distro/duckbotos
+
+Source: ${{ github.sha }}"
+            git push origin main
+            echo "✅ Pushed to DuckBotOS/main"
+            echo "result=pushed" >> $GITHUB_OUTPUT
+          fi

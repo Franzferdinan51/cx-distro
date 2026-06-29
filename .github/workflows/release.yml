@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.1.0)'
+        required: false
+        type: string
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  release:
+    name: Release cx-distro ${{ env.VERSION }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run installation tests
+        run: |
+          if [ -f scripts/install-deps.sh ]; then
+            bash scripts/install-deps.sh
+          fi
+
+      - name: Generate checksums
+        run: |
+          mkdir -p output
+          find . -name "*.deb" -exec cp {} output/ \;
+          cd output
+          sha256sum *.deb > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload release artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: cx-distro ${{ env.VERSION }}
+          draft: false
+          generate_release_notes: true
+          files: |
+            output/*.deb
+            output/SHA256SUMS
