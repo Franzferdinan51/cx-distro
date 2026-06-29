@@ -5,49 +5,81 @@ Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.2
 
-Package: duckbotos-hermes
+Package: duckbotos-mode-hermes
 Architecture: amd64 arm64
-Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
+Depends: duckbotos-base,
+         duckbotos-lm-studio,
+         duckbotos-browseros,
+         duckbotos-computer-use,
+         duckbotos-cua-bridge,
+         duckbotos-kiosk,
+         duckbotos-kiosk-hermes,
+         duckbotos-brain,
+         duckbotos-hermes,
          python3-pip, python3-venv, python3-yaml, python3-requests,
          curl, wget, git,
          ${misc:Depends}
-Description: DuckBotOS Hermes agent meta-package
- Installs Hermes (NousResearch) as the primary agent with full DuckBotOS
- stack: Hermes agent, web dashboard, LM Studio, BrowserOS, computer-use-linux,
- and Weston kiosk shell.
+Description: DuckBotOS Hermes-only install mode
+ Installs Hermes (NousResearch) as the primary agent with the full DuckBotOS
+ stack: Hermes agent, web dashboard, LM Studio, BrowserOS,
+ Newest Desktop Control (computer-use), trycua/cua bridge, Weston kiosk shell,
+ duckbot-rag-memory brain (default), and the Hermes kiosk configuration.
  .
- This is the "Hermes-only" install mode.
+ This is the "Hermes-only" install mode (DUCKBOTOS_MODE=hermes).
+Choose this if you want a single-agent focused experience.
 
-Package: duckbotos-openclaw
+Package: duckbotos-mode-openclaw
 Architecture: amd64 arm64
-Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
+Depends: duckbotos-base,
+         duckbotos-lm-studio,
+         duckbotos-browseros,
+         duckbotos-computer-use,
+         duckbotos-cua-bridge,
+         duckbotos-kiosk,
+         duckbotos-brain,
+         duckbotos-openclaw,
          nodejs, npm,
          ${misc:Depends}
-Description: DuckBotOS OpenClaw agent meta-package
- Installs OpenClaw as the primary agent with full DuckBotOS stack:
+Description: DuckBotOS OpenClaw-only install mode
+ Installs OpenClaw as the primary agent with the full DuckBotOS stack:
  OpenClaw gateway, openclaw-os plugin, LM Studio, BrowserOS,
- computer-use-linux, and Weston kiosk shell.
+ Newest Desktop Control (computer-use), trycua/cua bridge, Weston kiosk shell,
+ and duckbot-rag-memory brain (default).
  .
- This is the "OpenClaw-only" install mode.
+ This is the "OpenClaw-only" install mode (DUCKBOTOS_MODE=openclaw).
+Choose this if you want OpenClaw as your primary desktop agent.
 
-Package: duckbotos-hybrid
+Package: duckbotos-mode-hybrid
 Architecture: amd64 arm64
-Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
-         duckbotos-hermes, duckbotos-openclaw,
+Depends: duckbotos-base,
+         duckbotos-lm-studio,
+         duckbotos-browseros,
+         duckbotos-computer-use,
+         duckbotos-cua-bridge,
+         duckbotos-kiosk,
+         duckbotos-brain,
+         duckbotos-hermes,
+         duckbotos-openclaw,
+         duckbotos-session-picker,
          gdm3, gnome-session,
          ${misc:Depends}
-Description: DuckBotOS hybrid mode — both agents with session picker
- Installs both Hermes and OpenClaw with GDM session picker:
- Hermes Desktop, OpenClaw Desktop, Hybrid Workstation (GNOME + both panels).
- Full dual-agent experience with IPC bus and shared desktop control.
+Description: DuckBotOS hybrid install mode (Hermes + OpenClaw)
+ Installs both Hermes and OpenClaw with the DuckBotOS session picker.
+ At boot, users see a choice between:
  .
- This is the "Both" install mode.
+   [1] Hermes    — Fullscreen kiosk with Hermes Web Dashboard
+   [2] OpenClaw  — Fullscreen kiosk with OpenClaw workspace
+   [3] Hybrid    — GNOME desktop with both agents in a side panel
+ .
+ This is the most feature-complete DuckBotOS experience (DUCKBOTOS_MODE=hybrid).
+ Both agents are always running; you pick which interface to use per-session.
 
 Package: duckbotos-meta
 Architecture: amd64 arm64
-Depends: duckbotos-hermes
-Description: DuckBotOS default meta-package
- Default DuckBotOS installation. Installs Hermes agent as the primary
- desktop environment. This is the default install mode.
- Conflicts: duckbotos-openclaw, duckbotos-hybrid
+Depends: duckbotos-mode-hermes
+Description: DuckBotOS default meta-package (Hermes mode)
+ Default DuckBotOS installation. Pulls in Hermes mode by default.
+ To install OpenClaw or Hybrid mode, install duckbotos-mode-openclaw
+ or duckbotos-mode-hybrid instead.
+ Conflicts: duckbotos-mode-openclaw, duckbotos-mode-hybrid
 Suggests: duckbotos-docs

@@ -8,11 +8,18 @@ Vcs-Browser: https://github.com/nousresearch/hermes-agent
 
 Package: duckbotos-hermes
 Architecture: amd64 arm64
-Depends: python3-pip, python3-venv, python3-yaml, python3-requests, python3-aiohttp,
-         nodejs (>= 18), npm,
-         curl, wget, git,
+Depends: curl,
+         duckbotos-brain,
+         git,
          libportaudio2 (for voice features),
-         ${misc:Depends}
+         nodejs (>= 18),
+         npm,
+         python3-aiohttp,
+         python3-pip,
+         python3-requests,
+         python3-venv,
+         python3-yaml,
+         wget ${misc:Depends}
 Description: Hermes agent as primary desktop environment for DuckBotOS
  Installs Hermes (NousResearch hermes-agent) as the primary AI agent
  and desktop surface for DuckBotOS.

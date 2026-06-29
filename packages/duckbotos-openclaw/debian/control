@@ -9,7 +9,9 @@ Vcs-Browser: https://github.com/openclaw/openclaw
 Package: duckbotos-openclaw
 Architecture: amd64 arm64
 Depends: duckbotos-base,
-         nodejs (>= 18), npm,
+         duckbotos-brain,
+         nodejs (>= 18),
+         npm,
          ${misc:Depends}
 Description: OpenClaw as primary desktop environment for DuckBotOS
  Installs OpenClaw as the primary AI agent and desktop surface

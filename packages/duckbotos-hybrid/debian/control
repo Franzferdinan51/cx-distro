@@ -13,8 +13,12 @@ Depends: duckbotos-base,
          duckbotos-lm-studio,
          duckbotos-browseros,
          duckbotos-computer-use,
+         duckbotos-cua-bridge,
          duckbotos-kiosk,
+         duckbotos-kiosk-hermes,
+         duckbotos-kiosk-openclaw,
          duckbotos-session-picker,
+         duckbotos-brain,
          gdm3,
          gnome-session,
          ${misc:Depends}
@@ -30,5 +34,6 @@ Description: DuckBotOS hybrid mode — Hermes + OpenClaw with session picker
  are always running; you pick which interface to use per-session.
  .
  Dual-agent IPC: Hermes and OpenClaw coordinate via the agent bus
- (/run/hermes-claw/agent-bus.sock) and share the computer-use-linux
- MCP server for desktop control.
+ (/run/hermes-claw/agent-bus.sock) and share the Newest Desktop Control
+ (Lobster Edition) MCP server for desktop control, plus trycua/cua for
+ programmatic VM orchestration.

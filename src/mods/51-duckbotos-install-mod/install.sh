@@ -51,7 +51,7 @@ done
 # Build agent-specific packages
 for pkg in duckbotos-hermes duckbotos-openclaw duckbotos-lm-studio \
            duckbotos-browseros duckbotos-computer-use duckbotos-cua-bridge duckbotos-kiosk \
-           duckbotos-kiosk-hermes duckbotos-session-picker \
+           duckbotos-kiosk-hermes duckbotos-kiosk-openclaw duckbotos-session-picker \
            duckbotos-meta duckbotos-hybrid \
            duckbotos-brain; do
     if [ -d "$pkg" ]; then
@@ -60,39 +60,44 @@ for pkg in duckbotos-hermes duckbotos-openclaw duckbotos-lm-studio \
     fi
 done
 
-# Install based on mode
-print_info "Installing packages for mode: $DUCKBOTOS_MODE"
+# Pre-register all .deb files with dpkg's database so apt's resolver can find them
+# when the meta-package depends on them recursively
+print_info "  Registering built packages with dpkg database..."
 for deb in /tmp/cx-distro/packages/*.deb; do
     [ -f "$deb" ] || continue
-    pkg=$(dpkg-deb -f "$deb" Package)
-    
-    # Check if package matches the current mode
-    install=false
-    case "$DUCKBOTOS_MODE" in
-        hermes)
-            case "$pkg" in
-                duckbotos-hermes|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-cua-bridge|duckbotos-kiosk|duckbotos-kiosk-hermes|duckbotos-brain)
-                    install=true
-                    ;;
-            esac
-            ;;
-        openclaw)
-            case "$pkg" in
-                duckbotos-openclaw|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-cua-bridge|duckbotos-kiosk|duckbotos-brain)
-                    install=true
-                    ;;
-            esac
-            ;;
-        both|hybrid)
-            # Install all packages for both mode
-            install=true
-            ;;
-    esac
-    
-    if $install; then
-        print_info "  Installing $pkg..."
-        dpkg -i "$deb" || apt-get install -f -y
-    fi
+    dpkg -i "$deb" 2>/dev/null || true
 done
+apt-get install -f -y 2>&1 | tail -5 || true
 
-print_ok "DuckBotOS packages installed for mode: $DUCKBOTOS_MODE"
+# Install based on mode — use the appropriate meta-package, let apt resolve Depends
+print_info "Installing DuckBotOS meta-package for mode: $DUCKBOTOS_MODE"
+case "$DUCKBOTOS_MODE" in
+    hermes)
+        META_PKG="duckbotos-mode-hermes"
+        ;;
+    openclaw)
+        META_PKG="duckbotos-mode-openclaw"
+        ;;
+    both|hybrid)
+        META_PKG="duckbotos-mode-hybrid"
+        ;;
+    *)
+        print_warn "  Unknown mode '$DUCKBOTOS_MODE', defaulting to duckbotos-meta (Hermes)"
+        META_PKG="duckbotos-meta"
+        ;;
+esac
+
+print_info "  Installing $META_PKG (apt will resolve all Depends recursively)..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y "$META_PKG" 2>&1 | tail -10 || {
+    print_warn "  Meta install failed, falling back to dpkg -i on built debs"
+    # Fallback: manual install of all built packages
+    for deb in /tmp/cx-distro/packages/*.deb; do
+        [ -f "$deb" ] || continue
+        dpkg -i "$deb" 2>/dev/null || apt-get install -f -y 2>&1 | tail -3
+    done
+}
+
+print_ok "DuckBotOS meta-package $META_PKG installed (mode: $DUCKBOTOS_MODE)"
+
+# Mark which mode is the default so later code can read it
+echo "$META_PKG" > /etc/duckbotos/installed-mode
