@@ -52,7 +52,8 @@ done
 for pkg in duckbotos-hermes duckbotos-openclaw duckbotos-lm-studio \
            duckbotos-browseros duckbotos-computer-use duckbotos-kiosk \
            duckbotos-kiosk-hermes duckbotos-session-picker \
-           duckbotos-meta duckbotos-hybrid; do
+           duckbotos-meta duckbotos-hybrid \
+           duckbotos-brain; do
     if [ -d "$pkg" ]; then
         print_info "  Building $pkg..."
         (cd "$pkg" && dpkg-buildpackage -us -uc -b 2>&1) || print_warn "  $pkg build failed, skipping"
@@ -70,14 +71,14 @@ for deb in /tmp/cx-distro/packages/*.deb; do
     case "$DUCKBOTOS_MODE" in
         hermes)
             case "$pkg" in
-                duckbotos-hermes|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-kiosk|duckbotos-kiosk-hermes)
+                duckbotos-hermes|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-kiosk|duckbotos-kiosk-hermes|duckbotos-brain)
                     install=true
                     ;;
             esac
             ;;
         openclaw)
             case "$pkg" in
-                duckbotos-openclaw|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-kiosk)
+                duckbotos-openclaw|duckbotos-lm-studio|duckbotos-browseros|duckbotos-computer-use|duckbotos-kiosk|duckbotos-brain)
                     install=true
                     ;;
             esac

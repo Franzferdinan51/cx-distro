@@ -1,14 +1,17 @@
 #!/bin/bash
 # postinst for duckbotos-openclaw
-# Installs OpenClaw gateway from npm
+# Installs OpenClaw gateway from npm + wires duckbot-memory brain plugin
 
 set -e
 
 REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
 OPENCLAW_DIR="/opt/openclaw"
 OPENCLAW_DATA_DIR="/var/lib/openclaw"
+OPENCLAW_WORKSPACE_DIR="/var/lib/openclaw/workspace"
 SYSTEMD_USER_DIR="$REAL_HOME/.config/systemd/user"
 DUCKBOTOS_MODES_DIR="/etc/duckbotos"
+BRAIN_EXT_SRC="/opt/duckbotos/brain/extensions/duckbot-memory"
+OPENCLAW_EXT_DIR="/var/lib/openclaw/extensions"
 
 install_openclaw() {
     local home="${1:-$REAL_HOME}"
@@ -18,8 +21,9 @@ install_openclaw() {
     # Create directories
     mkdir -p "$OPENCLAW_DIR"
     mkdir -p "$OPENCLAW_DATA_DIR"
-    mkdir -p "$OPENCLAW_DATA_DIR/workspace"
+    mkdir -p "$OPENCLAW_WORKSPACE_DIR"
     mkdir -p "$SYSTEMD_USER_DIR"
+    mkdir -p "$OPENCLAW_EXT_DIR"
 
     # Clone OpenClaw if not present
     if [ ! -d "$OPENCLAW_DIR/.git" ]; then
@@ -58,12 +62,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=${OPENCLAW_DATA_DIR}/workspace
+WorkingDirectory=${OPENCLAW_WORKSPACE_DIR}
 Environment=OPENCLAW_HOME=${OPENCLAW_DIR}
-Environment=OPENCLAW_DATA=${OPENCLAW_DATA_DIR}/workspace
+Environment=OPENCLAW_DATA=${OPENCLAW_WORKSPACE_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=18789
-ExecStart=/usr/local/bin/openclaw gateway start --port 18789 --workspace ${OPENCLAW_DATA_DIR}/workspace
+ExecStart=/usr/local/bin/openclaw gateway start --port 18789 --workspace ${OPENCLAW_WORKSPACE_DIR}
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -99,6 +103,57 @@ SERVICE_EOF
     echo "[duckbotos-openclaw] OpenClaw installed."
 }
 
+register_brain_plugin() {
+    # Wire the duckbot-memory brain plugin (installed by duckbotos-brain package)
+    echo "[duckbotos-openclaw] Registering duckbot-memory brain plugin..."
+
+    # Copy the OpenClaw native plugin shim into OpenClaw's extensions dir
+    if [ -d "$BRAIN_EXT_SRC" ]; then
+        cp -r "$BRAIN_EXT_SRC" "$OPENCLAW_EXT_DIR/duckbot-memory"
+        echo "[duckbotos-openclaw] Brain plugin copied to $OPENCLAW_EXT_DIR/duckbot-memory"
+    else
+        echo "[duckbotos-openclaw] Warning: duckbotos-brain not yet installed. Skipping brain plugin."
+        return 0
+    fi
+
+    # Register plugin in openclaw.json via python (safe JSON patching)
+    OPENCLAW_CFG="$OPENCLAW_WORKSPACE_DIR/openclaw.json"
+    mkdir -p "$OPENCLAW_WORKSPACE_DIR"
+
+    # Create default openclaw.json if it doesn't exist
+    if [ ! -f "$OPENCLAW_CFG" ]; then
+        echo '{}' > "$OPENCLAW_CFG"
+    fi
+
+    python3 - << PYEOF
+import json, os
+cfg_path = '/var/lib/openclaw/workspace/openclaw.json'
+with open(cfg_path) as f:
+    cfg = json.load(f)
+
+# Ensure nested structure
+if 'plugins' not in cfg:
+    cfg['plugins'] = {}
+if 'entries' not in cfg['plugins']:
+    cfg['plugins']['entries'] = {}
+
+# Register duckbot-memory brain plugin
+cfg['plugins']['entries']['duckbot-memory'] = {
+    'enabled': True,
+    'config': {
+        'repoPath': '/opt/duckbotos/brain',
+        'autoWakeUp': True,   # brain_wake_up fires on every session_start
+        'autoSync': True,     # brain_sync fires on every session_end
+        'defaultK': 8
+    }
+}
+
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+print('[duckbotos-openclaw] duckbot-memory registered in openclaw.json')
+PYEOF
+}
+
 configure_kiosk_mode() {
     # Configure the kiosk to load OpenClaw by default
     mkdir -p "$DUCKBOTOS_MODES_DIR"
@@ -109,12 +164,13 @@ configure_kiosk_mode() {
 case "$1" in
     configure)
         install_openclaw
+        register_brain_plugin
         configure_kiosk_mode
 
         echo ""
         echo "✅ OpenClaw installed for DuckBotOS"
         echo "   Gateway:  http://localhost:18789"
-        echo "   Workspace: /plugins/openclawos"
+        echo "   Brain:    duckbot-memory plugin (67 tools + session hooks)"
         echo "   Config:   $OPENCLAW_DIR"
         echo ""
         echo "   To restart: systemctl --user restart openclaw-gateway"
