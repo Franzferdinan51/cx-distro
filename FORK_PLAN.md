@@ -91,7 +91,10 @@ Replace `scripts/install.sh` with our own that:
 3. Adds our APT repo + key
 4. `apt install duckbotos-meta` (mode auto-selected)
 
-### 7. live-build config changes
+### 7. Keep NVIDIA GPU packages (cx-gpu-nvidia) — Duckets confirmed target machine has NVIDIA GPU
+cx-gpu-nvidia brings: nvidia-driver, CUDA toolkit, nvidia-container-toolkit, GPU monitoring (nvidia-smi). LM Studio GPU inference works out of the box.
+
+### 8. live-build config changes
 
 In `iso/live-build/`:
 - Add our packages to package list (duckbotos-meta, etc.)
@@ -146,8 +149,8 @@ apt install -y \
 5. ⏳ Set up UTM Ubuntu 24.04 VM on Mac mini
 6. ⏳ Run `make deps` in VM, then `make iso`
 
-## CPU-only note (D1 confirmed)
-No NVIDIA/AMD GPU drivers needed for v1. Skip/remove:
+## NVIDIA GPU note (D1 updated 2026-06-29 10:40 EDT)
+Keep NVIDIA GPU drivers for v1. Target machine has NVIDIA GPU. LM Studio GPU inference supported. CPU-only fallback still builds without cx-gpu-nvidia. Skip cx-gpu-amd (AMD GPU not confirmed):
 - `cx-gpu-nvidia`
 - `cx-gpu-amd`
 
