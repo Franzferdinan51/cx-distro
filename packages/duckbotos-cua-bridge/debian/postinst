@@ -28,38 +28,36 @@ exec python3 -m cua "$@"
 CUAWRAP
         chmod +x /usr/local/bin/cua
 
-        # Wire into OpenClaw as a second computer-use backend
-        OPENCLAW_CFG="/var/lib/openclaw/workspace/openclaw.json"
-        if [ -d "/var/lib/openclaw/workspace" ]; then
-            mkdir -p "/var/lib/openclaw/workspace"
-            if [ ! -f "$OPENCLAW_CFG" ]; then
-                echo '{}' > "$OPENCLAW_CFG"
-            fi
-            python3 - << 'PYEOF'
+        # Wire into Hermes + OpenClaw — they use the same ~/.X/mcp.json format
+        REAL_USER=$(getent passwd | awk -F: '$3 >= 1000 {print $1; exit}')
+        REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
+        for cfg_dir in "$REAL_HOME/.hermes" "$REAL_HOME/.openclaw"; do
+            cfg_path="$cfg_dir/mcp.json"
+            [ -n "$REAL_USER" ] || continue
+            mkdir -p "$cfg_dir"
+            chown -R "$REAL_USER:$REAL_USER" "$cfg_dir" 2>/dev/null || true
+            [ -f "$cfg_path" ] || echo '{}' > "$cfg_path"
+            chown "$REAL_USER:$REAL_USER" "$cfg_path" 2>/dev/null || true
+            python3 - << PYEOF
 import json
-cfg = '/var/lib/openclaw/workspace/openclaw.json'
-with open(cfg) as f:
-    cfg_data = json.load(f)
-if 'plugins' not in cfg_data:
-    cfg_data['plugins'] = {}
-if 'entries' not in cfg_data['plugins']:
-    cfg_data['plugins']['entries'] = {}
-cfg_data['plugins']['entries']['cua-driver'] = {
-    'enabled': True,
-    'config': {
-        'command': 'cua-driver',
-        'args': ['mcp'],
-        'transport': 'stdio',
-        'name': 'cua-driver',
-        'description': 'trycua/cua bridge — VM orchestration + Linux backend for computer-use',
-        'repository': 'https://github.com/trycua/cua',
-    }
+with open('$cfg_path') as f:
+    data = json.load(f)
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+data['mcpServers']['cua-driver'] = {
+    'command': 'cua-driver',
+    'args': ['mcp'],
+    'env': {},
+    'transport': 'stdio',
+    'startup_timeout_sec': 20,
+    'tool_timeout_sec': 60,
+    'description': 'trycua/cua bridge - VM orchestration + Linux computer-use backend'
 }
-with open(cfg, 'w') as f:
-    json.dump(cfg_data, f, indent=2)
-print('[duckbotos-cua-bridge] cua-driver registered in openclaw.json')
+with open('$cfg_path', 'w') as f:
+    json.dump(data, f, indent=2)
+print('[duckbotos-cua-bridge] cua-driver registered')
 PYEOF
-        fi
+        done
 
         echo ""
         echo "✅ trycua/cua installed"

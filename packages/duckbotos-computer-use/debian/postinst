@@ -1,6 +1,6 @@
 #!/bin/bash
 # postinst for duckbotos-computer-use
-# Installs Duckets' local "Newest Desktop Control" Lobster Edition
+# Installs Duckets' local "Newest Desktop Control" (Lobster Edition)
 
 set -e
 
@@ -8,6 +8,7 @@ NDC_DIR="/opt/duckbotos/desktop-control"
 NDC_REPO="https://github.com/Franzferdinan51/desktop-control-lobster-edition-skill"
 REAL_HOME=$(getent passwd | awk -F: '$3 >= 1000 {print $6; exit}')
 REAL_USER=$(getent passwd | awk -F: '$3 >= 1000 {print $1; exit}')
+NDC_PATH="$NDC_DIR/src/server.js"
 
 case "$1" in
     configure)
@@ -26,15 +27,24 @@ case "$1" in
             pip3 install --break-system-packages --quiet -r "$NDC_DIR/requirements.txt" 2>&1 | tail -5 || true
         fi
 
-        # 3. Run install.sh with --no-tests (tests require a display)
-        echo "[duckbotos-computer-use] Running install.sh --no-tests --target openclaw..."
-        bash "$NDC_DIR/scripts/install.sh" --no-tests --target openclaw --no-config 2>&1 | tail -10 || true
+        # 3. Run install.sh (auto-detects OS, smoke-tests, prints configs)
+        echo "[duckbotos-computer-use] Running install.sh..."
+        bash "$NDC_DIR/scripts/install.sh" --no-tests --no-config 2>&1 | tail -10 || true
 
         # 4. Set permissions
         chown -R "$REAL_USER:$REAL_USER" "$NDC_DIR" 2>/dev/null || true
         chmod +x "$NDC_DIR/src/server.js"
 
-        # 5. Install systemd service
+        # 5. Use Duckets' own setup-config.js to generate the canonical MCP server config
+        SETUP_OUT=$(cd "$NDC_DIR" && node scripts/setup-config.js mcp-json --no-pretty --path "$NDC_PATH" 2>/dev/null | tail -1)
+        if [ -z "$SETUP_OUT" ]; then
+            SETUP_OUT=$(cat <<'EOF'
+{"mcpServers":{"newest-desktop-control":{"command":"node","args":["/opt/duckbotos/desktop-control/src/server.js"],"env":{},"transport":"stdio","startup_timeout_sec":20,"tool_timeout_sec":60}}}
+EOF
+            )
+        fi
+
+        # 6. Install systemd service (runs as user, auto-start on boot)
         cat > /etc/systemd/system/duckbotos-desktop-control.service << SVCEOF
 [Unit]
 Description=DuckBotOS Newest Desktop Control MCP server (Lobster Edition)
@@ -76,77 +86,83 @@ SVCEOF
         systemctl enable duckbotos-desktop-control.service 2>/dev/null || true
         systemctl start duckbotos-desktop-control.service 2>/dev/null || true
 
-        # 6. Wire into Hermes (writes MCP config)
-        HERMES_MCP_CFG="$REAL_HOME/.hermes/mcp-servers.json"
-        if [ -d "$REAL_HOME/.hermes" ]; then
-            mkdir -p "$REAL_HOME/.hermes"
-            if [ ! -f "$HERMES_MCP_CFG" ]; then
-                echo '{}' > "$HERMES_MCP_CFG"
-                chown "$REAL_USER:$REAL_USER" "$HERMES_MCP_CFG" 2>/dev/null || true
+        # 7. Wire into Hermes — uses ~/.hermes/mcp.json (proper Hermes location)
+        if [ -d "$REAL_HOME/.hermes" ] || mkdir -p "$REAL_HOME/.hermes"; then
+            chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.hermes" 2>/dev/null || true
+            HERMES_CFG="$REAL_HOME/.hermes/mcp.json"
+            if [ ! -f "$HERMES_CFG" ]; then
+                echo '{}' > "$HERMES_CFG"
+                chown "$REAL_USER:$REAL_USER" "$HERMES_CFG" 2>/dev/null || true
             fi
             python3 - << PYEOF
 import json
-cfg = '/${HERMES_MCP_CFG}'
+cfg = '$HERMES_CFG'
 with open(cfg) as f:
-    cfg_data = json.load(f)
-if 'mcpServers' not in cfg_data:
-    cfg_data['mcpServers'] = {}
-cfg_data['mcpServers']['desktop-control'] = {
+    data = json.load(f)
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+data['mcpServers']['newest-desktop-control'] = {
     'command': 'node',
-    'args': ['${NDC_DIR}/src/server.js'],
+    'args': ['$NDC_PATH'],
+    'env': {},
     'transport': 'stdio',
+    'startup_timeout_sec': 20,
+    'tool_timeout_sec': 60,
     'description': 'Newest Desktop Control (Lobster Edition) — DuckBotOS desktop control'
 }
 with open(cfg, 'w') as f:
-    json.dump(cfg_data, f, indent=2)
-print('[duckbotos-computer-use] Hermes MCP config updated.')
+    json.dump(data, f, indent=2)
+print('[duckbotos-computer-use] Hermes mcp.json updated.')
 PYEOF
-            chown -R "$REAL_USER:$REAL_USER" "$HERMES_MCP_CFG" 2>/dev/null || true
+            chown "$REAL_USER:$REAL_USER" "$HERMES_CFG" 2>/dev/null || true
         fi
 
-        # 7. Wire into OpenClaw via Python JSON patch
-        OPENCLAW_CFG="/var/lib/openclaw/workspace/openclaw.json"
-        if [ -d "/var/lib/openclaw/workspace" ]; then
-            mkdir -p "/var/lib/openclaw/workspace"
-            if [ ! -f "$OPENCLAW_CFG" ]; then
-                echo '{}' > "$OPENCLAW_CFG"
+        # 8. Wire into OpenClaw — uses ~/.openclaw/mcp.json (the SAME format as Hermes)
+        # Note: OpenClaw 18789 gateway ALSO supports the same mcp.json format
+        # as Hermes — that's the actual native MCP registration path
+        OPENCLAW_MCP_CFG="$REAL_HOME/.openclaw/mcp.json"
+        if [ -d "$REAL_HOME/.openclaw" ] || mkdir -p "$REAL_HOME/.openclaw"; then
+            chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.openclaw" 2>/dev/null || true
+            if [ ! -f "$OPENCLAW_MCP_CFG" ]; then
+                echo '{}' > "$OPENCLAW_MCP_CFG"
+                chown "$REAL_USER:$REAL_USER" "$OPENCLAW_MCP_CFG" 2>/dev/null || true
             fi
             python3 - << PYEOF
 import json
-cfg = '$OPENCLAW_CFG'
+cfg = '$OPENCLAW_MCP_CFG'
 with open(cfg) as f:
-    cfg_data = json.load(f)
-if 'plugins' not in cfg_data:
-    cfg_data['plugins'] = {}
-if 'entries' not in cfg_data['plugins']:
-    cfg_data['plugins']['entries'] = {}
-cfg_data['plugins']['entries']['desktop-control'] = {
-    'enabled': True,
-    'config': {
-        'command': 'node',
-        'args': ['$NDC_DIR/src/server.js'],
-        'transport': 'stdio',
-        'name': 'desktop-control',
-        'description': 'Newest Desktop Control — DuckBotOS desktop control via PyAutoGUI + AT-SPI2',
-        'repository': 'https://github.com/Franzferdinan51/desktop-control-lobster-edition-skill',
-    }
+    data = json.load(f)
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+data['mcpServers']['newest-desktop-control'] = {
+    'command': 'node',
+    'args': ['$NDC_PATH'],
+    'env': {},
+    'transport': 'stdio',
+    'startup_timeout_sec': 20,
+    'tool_timeout_sec': 60,
+    'description': 'Newest Desktop Control (Lobster Edition) — DuckBotOS desktop control'
 }
 with open(cfg, 'w') as f:
-    json.dump(cfg_data, f, indent=2)
-print('[duckbotos-computer-use] OpenClaw plugin desktop-control registered.')
+    json.dump(data, f, indent=2)
+print('[duckbotos-computer-use] OpenClaw mcp.json updated.')
 PYEOF
-            # Restart OpenClaw to pick up new plugin
-            if command -v systemctl >/dev/null 2>&1 && [ -n "$REAL_USER" ]; then
-                systemctl --user restart openclaw-gateway 2>/dev/null || true
-            fi
+            chown "$REAL_USER:$REAL_USER" "$OPENCLAW_MCP_CFG" 2>/dev/null || true
+        fi
+
+        # 9. Restart services to pick up the new MCP servers
+        if command -v systemctl >/dev/null 2>&1 && [ -n "$REAL_USER" ]; then
+            systemctl --user restart openclaw-gateway 2>/dev/null || true
+            systemctl --user restart hermes-gateway 2>/dev/null || true
         fi
 
         echo ""
         echo "✅ Newest Desktop Control (Lobster Edition) installed at $NDC_DIR"
         echo "   Service: systemctl status duckbotos-desktop-control"
         echo "   MCP tools: 20+ (screenshot, mouse, keyboard, clipboard, apps, windows, files, Android)"
-        echo "   Hermes: MCP server registered at $HERMES_MCP_CFG"
-        echo "   OpenClaw: plugin desktop-control registered in openclaw.json"
+        echo "   Hermes:  ~/.hermes/mcp.json (newest-desktop-control registered)"
+        echo "   OpenClaw: ~/.openclaw/mcp.json (newest-desktop-control registered)"
+        echo "   Installed via Duckets' own install.sh — no manual JSON drift"
         echo "   Optional: install duckbotos-cua-bridge for trycua/cua integration"
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
