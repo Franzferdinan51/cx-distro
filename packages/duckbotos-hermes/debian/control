@@ -1,0 +1,32 @@
+Source: duckbotos-hermes
+Section: science
+Priority: optional
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Vcs-Browser: https://github.com/nousresearch/hermes-agent
+
+Package: duckbotos-hermes
+Architecture: amd64 arm64
+Depends: python3-pip, python3-venv, python3-yaml, python3-requests, python3-aiohttp,
+         nodejs (>= 18), npm,
+         curl, wget, git,
+         libportaudio2 (for voice features),
+         ${misc:Depends}
+Description: Hermes agent as primary desktop environment for DuckBotOS
+ Installs Hermes (NousResearch hermes-agent) as the primary AI agent
+ and desktop surface for DuckBotOS.
+ .
+ Hermes provides:
+ - Web Dashboard at http://localhost:9119 (chat, sessions, TUI)
+ - Gateway API at http://localhost:9110 (for MCP and tool integration)
+ - CLI: hermes gateway start / hermes chat / hermes tools
+ - Skills system, memory, cron, messaging gateway
+ - Sub-agent spawning, multi-agent coordination
+ - Voice features: wake-word detection, speech-to-text, text-to-speech
+ .
+ In DuckBotOS, Hermes runs as a systemd user service and the Weston
+ kiosk loads the web dashboard in fullscreen Chromium.
+ .
+ Homepage: https://github.com/nousresearch/hermes-agent
+Version: 0.17 (Reach)

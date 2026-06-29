@@ -1,0 +1,41 @@
+#!/bin/bash
+# postinst for duckbotos-hermes
+
+set -e
+
+HERMES_HOME="${HOME}/.hermes"
+HERMES_SERVICE_DIR="${HOME}/.config/systemd/user"
+HERMES_SERVICE="${HERMES_SERVICE_DIR}/hermes-gateway.service"
+
+case "$1" in
+    configure)
+        # Create hermes user home if needed
+        mkdir -p "$HERMES_HOME"
+
+        # Enable lingering so hermes starts at boot without login
+        if command -v loginctl >/dev/null 2>&1 && [ -n "$SUDO_USER" ]; then
+            loginctl enable-linger "$SUDO_USER" 2>/dev/null || true
+        fi
+
+        # Create hermes CLI alias in /etc/profile.d
+        cat > /etc/profile.d/duckbotos-hermes.sh << 'ALIAS'
+# DuckBotOS Hermes CLI alias
+alias hermes='hermes'
+export HERMES_HOME="${HERMES_HOME:-~/.hermes}"
+export HERMES_URL="${HERMES_URL:-http://localhost:9110}"
+ALIAS
+        chmod 644 /etc/profile.d/duckbotos-hermes.sh
+
+        echo ""
+        echo "✅ Hermes agent installed for DuckBotOS"
+        echo "   Dashboard: http://localhost:9119"
+        echo "   Gateway:   http://localhost:9110"
+        echo "   Config:    $HERMES_HOME"
+        echo ""
+        echo "   First run: hermes gateway start"
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        ;;
+esac

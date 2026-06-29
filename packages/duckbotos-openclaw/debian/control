@@ -1,0 +1,29 @@
+Source: duckbotos-openclaw
+Section: science
+Priority: optional
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Vcs-Browser: https://github.com/openclaw/openclaw
+
+Package: duckbotos-openclaw
+Architecture: amd64 arm64
+Depends: duckbotos-base,
+         nodejs (>= 18), npm,
+         ${misc:Depends}
+Description: OpenClaw as primary desktop environment for DuckBotOS
+ Installs OpenClaw as the primary AI agent and desktop surface
+ for DuckBotOS.
+ .
+ OpenClaw provides:
+ - Gateway API at http://localhost:18789
+ - openclaw-os web workspace plugin at /plugins/openclawos
+ - 40+ built-in tools (shell, file, browser, memory, sub-agents, cron)
+ - Multi-channel messaging (Telegram, Signal, etc.)
+ - Sub-conscious daemon for long-term memory and pattern recognition
+ - Hybrid orchestrator for task routing
+ .
+ In DuckBotOS, OpenClaw runs as a systemd user service and the
+ Weston kiosk loads the openclaw-os workspace in fullscreen Chromium.
+ .
+ Homepage: https://github.com/openclaw/openclaw

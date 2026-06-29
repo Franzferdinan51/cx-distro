@@ -1,0 +1,28 @@
+Source: duckbotos-browseros
+Section: web
+Priority: optional
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Vcs-Browser: https://github.com/browseros-ai/BrowserOS
+
+Package: duckbotos-browseros
+Architecture: amd64 arm64
+Depends: wget, curl, gnupg2, apt-transport-https,
+         xdg-utils,
+         ${misc:Depends}
+Description: BrowserOS as the default browser for DuckBotOS
+ Installs BrowserOS (https://github.com/browseros-ai/BrowserOS) as the
+ default system web browser for DuckBotOS. BrowserOS is a Chromium-based
+ browser with native AI agent support — Claude Code and Codex can run
+ directly in-browser.
+ .
+ This package:
+ - Adds the BrowserOS APT repository
+ - Installs browseros-cli and the BrowserOS app
+ - Sets BrowserOS as the default browser via update-alternatives and xdg-settings
+ - Registers browseros-cli in PATH
+ .
+ The version installed matches the latest stable release from the
+ BrowserOS GitHub releases page.
+Homepage: https://github.com/browseros-ai/BrowserOS

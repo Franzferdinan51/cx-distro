@@ -1,0 +1,53 @@
+Source: duckbotos-meta
+Section: metapackages
+Priority: optional
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+
+Package: duckbotos-hermes
+Architecture: amd64 arm64
+Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
+         python3-pip, python3-venv, python3-yaml, python3-requests,
+         curl, wget, git,
+         ${misc:Depends}
+Description: DuckBotOS Hermes agent meta-package
+ Installs Hermes (NousResearch) as the primary agent with full DuckBotOS
+ stack: Hermes agent, web dashboard, LM Studio, BrowserOS, computer-use-linux,
+ and Weston kiosk shell.
+ .
+ This is the "Hermes-only" install mode.
+
+Package: duckbotos-openclaw
+Architecture: amd64 arm64
+Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
+         nodejs, npm,
+         ${misc:Depends}
+Description: DuckBotOS OpenClaw agent meta-package
+ Installs OpenClaw as the primary agent with full DuckBotOS stack:
+ OpenClaw gateway, openclaw-os plugin, LM Studio, BrowserOS,
+ computer-use-linux, and Weston kiosk shell.
+ .
+ This is the "OpenClaw-only" install mode.
+
+Package: duckbotos-hybrid
+Architecture: amd64 arm64
+Depends: duckbotos-base, duckbotos-lm-studio, duckbotos-browseros, duckbotos-computer-use, duckbotos-kiosk,
+         duckbotos-hermes, duckbotos-openclaw,
+         gdm3, gnome-session,
+         ${misc:Depends}
+Description: DuckBotOS hybrid mode — both agents with session picker
+ Installs both Hermes and OpenClaw with GDM session picker:
+ Hermes Desktop, OpenClaw Desktop, Hybrid Workstation (GNOME + both panels).
+ Full dual-agent experience with IPC bus and shared desktop control.
+ .
+ This is the "Both" install mode.
+
+Package: duckbotos-meta
+Architecture: amd64 arm64
+Depends: duckbotos-hermes
+Description: DuckBotOS default meta-package
+ Default DuckBotOS installation. Installs Hermes agent as the primary
+ desktop environment. This is the default install mode.
+ Conflicts: duckbotos-openclaw, duckbotos-hybrid
+Suggests: duckbotos-docs

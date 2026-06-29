@@ -1,16 +1,20 @@
-# CX Linux Distribution Build System
-# Copyright 2025 AI Venture Holdings LLC
+# DuckBotOS Distribution Build System
+# Forked from cxlinux-ai/cx-distro → Franzferdinan51/cx-distro
 # SPDX-License-Identifier: Apache-2.0
+#
+# Base: Ubuntu 24.04 LTS Noble Numbat
+# Agents: Hermes (NousResearch) + OpenClaw
+# License: Apache 2.0 (our code), BSL 1.1 (cxlinux-ai build pipeline)
 
 SHELL := /bin/bash
 .PHONY: all iso iso-netinst iso-offline package sbom clean test help
 
 # Build configuration
-CODENAME := trixie
+CODENAME := noble
 ARCH := amd64
 VERSION := 0.1.0
 BUILD_DATE := $(shell date +%Y%m%d)
-ISO_NAME := cx-linux-$(VERSION)-$(ARCH)-$(BUILD_DATE)
+ISO_NAME := duckbotos-$(VERSION)-$(ARCH)-$(BUILD_DATE)
 
 # Directories
 BUILD_DIR := build
@@ -18,14 +22,17 @@ ISO_DIR := iso/live-build
 OUTPUT_DIR := output
 PACKAGES_DIR := packages
 
-# Colors for output
-GREEN := \033[0;32m
+# Colors
+GREEN  := \033[0;32m
 YELLOW := \033[1;33m
-RED := \033[0;31m
-NC := \033[0m
+RED    := \033[0;31m
+NC     := \033[0m
 
 help:
-	@echo "CX Linux Distribution Build System"
+	@echo "DuckBotOS Distribution Build System"
+	@echo "===================================="
+	@echo "Base:     Ubuntu 24.04 LTS Noble Numbat"
+	@echo "Agents:   Hermes (NousResearch) + OpenClaw"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
@@ -34,7 +41,7 @@ help:
 	@echo "  iso-netinst   Build minimal network installer ISO"
 	@echo "  iso-offline   Build full offline ISO with package pool"
 	@echo "  package       Build all meta-packages"
-	@echo "  package PKG=x Build specific package (cx-core, cx-full, cx-archive-keyring)"
+	@echo "  package PKG=x Build specific package (duckbotos-hermes, duckbotos-openclaw, etc.)"
 	@echo "  sbom          Generate Software Bill of Materials"
 	@echo "  test          Run build verification tests"
 	@echo "  clean         Remove build artifacts"
@@ -65,30 +72,40 @@ deps:
 		gnupg \
 		syft \
 		cyclonedx-cli \
-		python3-pip
-	@echo -e "$(GREEN)Dependencies installed$(NC)"
+		python3-pip \
+		wget \
+		curl \
+		git \
+		rustc \
+		cargo \
+		pkg-config \
+		libatspi2.0-dev \
+		libwayland-dev \
+		libgtk-3-dev \
+		libssl-dev
+	@echo -e "$(GREEN)Dependencies installed. Next: make iso$(NC)"
 
-# Configure live-build
+# Configure live-build for Ubuntu 24.04
 $(BUILD_DIR)/.configured:
-	@echo -e "$(GREEN)Configuring live-build...$(NC)"
+	@echo -e "$(GREEN)Configuring live-build for Ubuntu $(CODENAME)...$(NC)"
 	mkdir -p $(BUILD_DIR)
 	cd $(ISO_DIR) && lb config \
 		--distribution $(CODENAME) \
-		--archive-areas "main contrib non-free non-free-firmware" \
+		--archive-areas "main universe multiverse" \
 		--architectures $(ARCH) \
 		--binary-images iso-hybrid \
 		--bootloaders "grub-efi,syslinux" \
 		--debian-installer live \
 		--debian-installer-gui false \
-		--iso-application "CX Linux" \
-		--iso-publisher "AI Venture Holdings LLC" \
-		--iso-volume "CX Linux $(VERSION)" \
+		--iso-application "DuckBotOS" \
+		--iso-publisher "DuckBotOS Team" \
+		--iso-volume "DuckBotOS $(VERSION)" \
 		--memtest none \
 		--security true \
 		--updates true \
 		--backports true \
 		--apt-indices true \
-		--apt-recommends true \
+		--apt-recommends false \
 		--apt-source-archives false \
 		--cache true \
 		--checksums sha256 \
@@ -96,15 +113,15 @@ $(BUILD_DIR)/.configured:
 		--color \
 		--compression xz \
 		--debconf-frontend noninteractive \
-		--debootstrap-options "--variant=minbase" \
+		--debootstrap-options "--variant=minbase --include=ubuntu-keyring,software-properties-common" \
 		--firmware-binary true \
 		--firmware-chroot true \
 		--initramfs live-boot \
 		--interactive false \
-		--linux-packages "linux-image linux-headers" \
-		--mode debian \
+		--linux-packages "linux-image-generic-hwe-$(ARCH) linux-headers-generic-hwe-$(ARCH)" \
+		--mode ubuntu \
 		--system live \
-		--bootappend-live "boot=live components quiet splash"
+		--bootappend-live "boot=live components quiet splash hostname=duckbotos"
 	touch $@
 
 # Build ISO
@@ -119,12 +136,13 @@ iso-netinst: $(BUILD_DIR)/.configured
 	@echo -e "$(GREEN)ISO built: $(OUTPUT_DIR)/$(ISO_NAME)-netinst.iso$(NC)"
 
 iso-offline: $(BUILD_DIR)/.configured package
-	@echo -e "$(GREEN)Building full offline ISO...$(NC)"
+	@echo -e "$(GREEN)Building full offline DuckBotOS ISO...$(NC)"
 	cd $(ISO_DIR) && sudo lb build 2>&1 | tee $(BUILD_DIR)/build-offline.log
 	mkdir -p $(OUTPUT_DIR)
 	mv $(ISO_DIR)/live-image-$(ARCH).hybrid.iso $(OUTPUT_DIR)/$(ISO_NAME)-offline.iso
 	cd $(OUTPUT_DIR) && sha256sum $(ISO_NAME)-offline.iso > $(ISO_NAME)-offline.iso.sha256
 	@echo -e "$(GREEN)ISO built: $(OUTPUT_DIR)/$(ISO_NAME)-offline.iso$(NC)"
+	@echo -e "$(GREEN)Size: $$(du -h $(OUTPUT_DIR)/$(ISO_NAME)-offline.iso | cut -f1)$(NC)"
 
 # Build packages
 package:
@@ -132,13 +150,23 @@ ifdef PKG
 	@echo -e "$(GREEN)Building package: $(PKG)$(NC)"
 	cd $(PACKAGES_DIR)/$(PKG) && dpkg-buildpackage -us -uc -b
 else
-	@echo -e "$(GREEN)Building all packages...$(NC)"
-	for pkg in cx-archive-keyring cx-core cx-full; do \
+	@echo -e "$(GREEN)Building all DuckBotOS packages...$(NC)"
+	for pkg in \
+		duckbotos-base \
+		duckbotos-hermes \
+		duckbotos-openclaw \
+		duckbotos-lm-studio \
+		duckbotos-browseros \
+		duckbotos-computer-use \
+		duckbotos-kiosk \
+		duckbotos-meta \
+		duckbotos-hybrid \
+		duckbotos-branding; do \
 		echo -e "$(YELLOW)Building $$pkg...$(NC)"; \
 		cd $(PACKAGES_DIR)/$$pkg && dpkg-buildpackage -us -uc -b && cd ../..; \
 	done
 endif
-	@echo -e "$(GREEN)Packages built$(NC)"
+	@echo -e "$(GREEN)Packages built in $(PACKAGES_DIR)/$(NC)"
 
 # Generate SBOM
 sbom:

@@ -1,0 +1,44 @@
+Source: duckbotos-base
+Section: admin
+Priority: required
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+
+Package: duckbotos-base
+Architecture: amd64 arm64
+Essential: yes
+Priority: required
+Depends: 
+    # Core OS essentials
+    ubuntu-standard,
+    ubuntu-server,
+    openssh-server,
+    systemd,
+    udev,
+    # Build tools
+    curl, wget, git, jq, zip, unzip, tar, gzip,
+    # Python runtime (Hermes + agents)
+    python3, python3-pip, python3-venv, python3-yaml, python3-requests, python3-aiohttp, python3-pygame,
+    # Node runtime (OpenClaw)
+    nodejs, npm,
+    # System utilities
+    htop, tree, vim, nano, rsync, ncdu, strace, lsof, net-tools, iproute2, iputils-ping,
+    # Audio (Hermes voice features)
+    libportaudio2, alsa-utils, pulseaudio,
+    # Display / Wayland
+    weston, xwayland, wayland-protocols, libwayland-bin,
+    # Security
+    ufw, fail2ban, apt-listbugs,
+    ${misc:Depends}
+Description: DuckBotOS base system — required for all install modes
+ This is the base package that all DuckBotOS install modes depend on.
+ It provides the minimal Ubuntu 24.04 system with:
+ - Ubuntu Server base + standard utils
+ - Python 3 + pip (Hermes, OpenClaw, skills)
+ - Node.js 18+ (OpenClaw)
+ - Weston compositor (kiosk shell)
+ - Audio support (voice features)
+ - Basic system monitoring and security tools
+ .
+ This package is Essential and Priority=required — it cannot be removed.

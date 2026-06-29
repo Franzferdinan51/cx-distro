@@ -1,0 +1,30 @@
+Source: duckbotos-computer-use
+Section: utils
+Priority: optional
+Maintainer: DuckBotOS Team <duckets@duckbotos.dev>
+Build-Depends: debhelper-compat (= 13), cargo | rustc, pkg-config, libatspi2.0-dev, libwayland-dev, libgtk-3-dev, libssl-dev
+Standards-Version: 4.6.2
+
+Package: duckbotos-computer-use
+Architecture: amd64 arm64
+Depends: at-spi2-core, at-spi2-atk, libgtk-3-0, libwayland-client0,
+         grim (for screenshots), wl-clipboard (for clipboard),
+         ${misc:Depends}, ${shlibs:Depends}
+Description: Rust MCP server for Linux desktop control
+ computer-use-linux provides an MCP server that gives AI agents full
+ control over a Linux desktop environment via AT-SPI2, Wayland portals,
+ and compositor D-Bus APIs.
+ .
+ Capabilities:
+ - Accessibility tree inspection (AT-SPI2)
+ - Mouse/keyboard input injection
+ - Window management (list, focus, move, resize)
+ - Screenshot capture
+ - Clipboard access
+ - App launching via D-Bus
+ - System tray integration
+ .
+ This is the shared desktop control backend used by both Hermes and
+ OpenClaw when running in DuckBotOS. The agent connects as an MCP
+ client to this service.
+Homepage: https://github.com/agent-sh/computer-use-linux
