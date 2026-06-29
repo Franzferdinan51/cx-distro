@@ -82,7 +82,7 @@ ISO build (cx-distro/)     →  DuckBotOS.iso
 - **cxlinux-ai/cx-distro inherited code**: BSL 1.1 (free for personal use, converts to Apache 2032)
 - **Hermes**: MIT (NousResearch)
 - **OpenClaw**: MIT (OpenClaw team)
-- **Newest Desktop Control (Lobster Edition)**: TBD (agent-sh)
+- **Newest Desktop Control (Lobster Edition)**: MIT ([Franzferdinan51/clawdwatch-lobster-edition](https://github.com/Franzferdinan51/clawdwatch-lobster-edition))
 - **BrowserOS**: TBD (browseros-ai)
 
 ## Upstream Tracking

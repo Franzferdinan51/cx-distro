@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=duckets
+User=%h
 WorkingDirectory=%h
 Environment=HERMES_HOME=%h/.hermes
 Environment=HERMES_URL=http://localhost:9110
