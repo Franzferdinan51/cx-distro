@@ -35,13 +35,12 @@ case "$1" in
         chown -R "$REAL_USER:$REAL_USER" "$NDC_DIR" 2>/dev/null || true
         chmod +x "$NDC_DIR/src/server.js"
 
-        # 5. Use Duckets' own setup-config.js to generate the canonical MCP server config
-        SETUP_OUT=$(cd "$NDC_DIR" && node scripts/setup-config.js mcp-json --no-pretty --path "$NDC_PATH" 2>/dev/null | tail -1)
-        if [ -z "$SETUP_OUT" ]; then
-            SETUP_OUT=$(cat <<'EOF'
-{"mcpServers":{"newest-desktop-control":{"command":"node","args":["/opt/duckbotos/desktop-control/src/server.js"],"env":{},"transport":"stdio","startup_timeout_sec":20,"tool_timeout_sec":60}}}
-EOF
-            )
+        # 5. Use Duckets' own setup-config.js to generate the canonical MCP server config.
+        # Note: target=openclaw emits the FULL {"mcpServers":{...}} envelope (target=mcp-json emits only the inner object).
+        # Parse the second-line JSON from the output (after the # comment header).
+        SETUP_OUT=$(cd "$NDC_DIR" && node scripts/setup-config.js openclaw --no-pretty --path "$NDC_PATH" 2>/dev/null | awk '/^\{/{flag=1} flag; /^\}/{flag=0}')
+        if [ -z "$SETUP_OUT" ] || ! echo "$SETUP_OUT" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+            SETUP_OUT='{"mcpServers":{"newest-desktop-control":{"command":"node","args":["/opt/duckbotos/desktop-control/src/server.js"],"env":{},"transport":"stdio","startup_timeout_sec":20,"tool_timeout_sec":60}}}'
         fi
 
         # 6. Install systemd service (runs as user, auto-start on boot)
@@ -99,20 +98,16 @@ import json
 cfg = '$HERMES_CFG'
 with open(cfg) as f:
     data = json.load(f)
-if 'mcpServers' not in data:
-    data['mcpServers'] = {}
-data['mcpServers']['newest-desktop-control'] = {
-    'command': 'node',
-    'args': ['$NDC_PATH'],
-    'env': {},
-    'transport': 'stdio',
-    'startup_timeout_sec': 20,
-    'tool_timeout_sec': 60,
-    'description': 'Newest Desktop Control (Lobster Edition) — DuckBotOS desktop control'
-}
+setup_out = '${SETUP_OUT}'
+if setup_out:
+    setup_data = json.loads(setup_out)
+    if 'mcpServers' in setup_data:
+        if 'mcpServers' not in data:
+            data['mcpServers'] = {}
+        data['mcpServers'].update(setup_data['mcpServers'])
 with open(cfg, 'w') as f:
     json.dump(data, f, indent=2)
-print('[duckbotos-computer-use] Hermes mcp.json updated.')
+print('[duckbotos-computer-use] Hermes mcp.json updated (canonical SETUP_OUT)')
 PYEOF
             chown "$REAL_USER:$REAL_USER" "$HERMES_CFG" 2>/dev/null || true
         fi
@@ -132,20 +127,16 @@ import json
 cfg = '$OPENCLAW_MCP_CFG'
 with open(cfg) as f:
     data = json.load(f)
-if 'mcpServers' not in data:
-    data['mcpServers'] = {}
-data['mcpServers']['newest-desktop-control'] = {
-    'command': 'node',
-    'args': ['$NDC_PATH'],
-    'env': {},
-    'transport': 'stdio',
-    'startup_timeout_sec': 20,
-    'tool_timeout_sec': 60,
-    'description': 'Newest Desktop Control (Lobster Edition) — DuckBotOS desktop control'
-}
+setup_out = '${SETUP_OUT}'
+if setup_out:
+    setup_data = json.loads(setup_out)
+    if 'mcpServers' in setup_data:
+        if 'mcpServers' not in data:
+            data['mcpServers'] = {}
+        data['mcpServers'].update(setup_data['mcpServers'])
 with open(cfg, 'w') as f:
     json.dump(data, f, indent=2)
-print('[duckbotos-computer-use] OpenClaw mcp.json updated.')
+print('[duckbotos-computer-use] OpenClaw mcp.json updated (canonical SETUP_OUT)')
 PYEOF
             chown "$REAL_USER:$REAL_USER" "$OPENCLAW_MCP_CFG" 2>/dev/null || true
         fi
